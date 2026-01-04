@@ -15,7 +15,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [recitingMessageId, setRecitingMessageId] = useState(null);
   const messagesEndRef = useRef(null);
-  const speechSynthesisRef = useRef(null);
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
@@ -29,36 +28,42 @@ function App() {
 
   useEffect(() => {
     return () => {
-      if (speechSynthesisRef.current) {
+      if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
       }
     };
   }, []);
 
-  const recitePoem = (text, messageId) => {
+  const handleRecite = (text, messageId) => {
+    if (!window.speechSynthesis) {
+      alert('Text-to-speech is not supported in your browser');
+      return;
+    }
+
+    if (recitingMessageId === messageId) {
+      window.speechSynthesis.cancel();
+      setRecitingMessageId(null);
+      return;
+    }
+
     window.speechSynthesis.cancel();
-    
     setRecitingMessageId(messageId);
+
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.8;
-    utterance.pitch = 1.1;
-    utterance.volume = 1;
-    
+    utterance.rate = 0.85;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
     utterance.onend = () => {
       setRecitingMessageId(null);
     };
-    
-    utterance.onerror = () => {
+
+    utterance.onerror = (event) => {
+      console.error('Speech error:', event);
       setRecitingMessageId(null);
     };
-    
-    speechSynthesisRef.current = utterance;
-    window.speechSynthesis.speak(utterance);
-  };
 
-  const stopReciting = () => {
-    window.speechSynthesis.cancel();
-    setRecitingMessageId(null);
+    window.speechSynthesis.speak(utterance);
   };
 
   const generatePoem = async (topic) => {
@@ -76,7 +81,7 @@ function App() {
       if (response.ok) {
         return data.poem;
       } else {
-        return "I'm having trouble composing right now. Please try again in a moment.";
+        return `Error: ${data.error}\n${data.details || ''}`;
       }
     } catch (error) {
       console.error("Error generating poem:", error);
@@ -130,7 +135,7 @@ function App() {
           <div>
             <h1 className="header-title">Create Poem with Mr Bukkan</h1>
             <p className="header-subtitle">
-              {isLoading ? 'Composing your poem...' : 'Your personal poet • Ready to create'}
+              {isLoading ? 'Composing your poem...' : 'Your personal poet • Powered by Google Gemini'}
             </p>
           </div>
         </div>
@@ -155,11 +160,11 @@ function App() {
                 <p className="message-text">{message.text}</p>
                 {message.sender === 'bot' && message.id !== 1 && (
                   <button
-                    onClick={() => recitingMessageId === message.id ? stopReciting() : recitePoem(message.text, message.id)}
+                    onClick={() => handleRecite(message.text, message.id)}
                     className={`recite-button ${recitingMessageId === message.id ? 'recite-active' : ''}`}
                   >
                     <Volume2 className={`recite-icon ${recitingMessageId === message.id ? 'icon-bounce' : ''}`} />
-                    <span>{recitingMessageId === message.id ? 'Stop Reciting' : 'Recite Poem'}</span>
+                    <span>{recitingMessageId === message.id ? 'Stop' : 'Recite'}</span>
                   </button>
                 )}
               </div>
