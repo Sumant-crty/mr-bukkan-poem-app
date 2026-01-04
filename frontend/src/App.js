@@ -135,7 +135,7 @@ function App() {
           <div>
             <h1 className="header-title">Create Poem with Mr Bukkan</h1>
             <p className="header-subtitle">
-              {isLoading ? 'Composing your poem...' : 'Your personal poet • Powered by Google Gemini'}
+              {isLoading ? 'Composing your poem...' : 'Your personal poet'}
             </p>
           </div>
         </div>
