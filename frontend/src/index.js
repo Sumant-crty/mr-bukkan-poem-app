@@ -1,5 +1,3 @@
-Filename: frontend/src/index.js
-Content:
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
