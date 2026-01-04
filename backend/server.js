@@ -85,12 +85,90 @@ app.post('/api/generate-poem', async (req, res) => {
     const requestBody = {
       contents: [{
         parts: [{
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+require('dotenv').config();
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+}));
+
+app.use(express.json());
+
+// Test endpoint
+app.get('/api/test-google-api', async (req, res) => {
+  try {
+    const apiKey = process.env.GOOGLE_API_KEY;
+    
+    if (!apiKey) {
+      return res.json({ 
+        error: 'No API key configured',
+        solution: 'Add GOOGLE_API_KEY to Render Environment Variables',
+        environment: process.env.NODE_ENV || 'development'
+      });
+    }
+
+    console.log('Testing API key...');
+    console.log('API Key prefix:', apiKey.substring(0, 10));
+
+    const response = await axios.get(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+    );
+    
+    return res.json({
+      success: true,
+      apiKeyValid: true,
+      environment: process.env.NODE_ENV || 'development',
+      availableModels: response.data.models?.map(m => m.name) || []
+    });
+  } catch (error) {
+    console.error('API Test Error:', error.response?.data);
+    return res.json({
+      success: false,
+      error: error.response?.data?.error?.message || error.message,
+      statusCode: error.response?.status
+    });
+  }
+});
+
+// Generate poem endpoint - UPDATED WITH CORRECT MODEL
+app.post('/api/generate-poem', async (req, res) => {
+  try {
+    const { topic } = req.body;
+    const apiKey = process.env.GOOGLE_API_KEY;
+
+    if (!topic) {
+      return res.status(400).json({ error: 'Topic is required' });
+    }
+
+    if (!apiKey) {
+      return res.status(500).json({ 
+        error: 'Google API key not configured on server'
+      });
+    }
+
+    console.log('\n=== Generating Poem ===');
+    console.log('Topic:', topic);
+    console.log('Using API key prefix:', apiKey.substring(0, 10));
+
+    // FIXED: Use gemini-2.5-flash (available in your API)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    
+    const requestBody = {
+      contents: [{
+        parts: [{
           text: `You are Mr Bukkan, a talented poet. Write a beautiful, creative, and engaging poem about "${topic}". Make it emotional, vivid, and memorable. The poem should be 8-16 lines long. Use beautiful imagery and metaphors. Only respond with the poem itself, no additional commentary.`
         }]
       }]
     };
 
-    console.log('Sending request to Gemini API...');
+    console.log('Sending request to Gemini API with model: gemini-2.5-flash');
 
     const response = await axios.post(url, requestBody, {
       headers: { 'Content-Type': 'application/json' },
@@ -122,17 +200,17 @@ app.post('/api/generate-poem', async (req, res) => {
     let solution = 'Please try again';
 
     if (error.response?.status === 400) {
-      errorMessage = 'Invalid API key or API not enabled';
-      solution = 'Visit: https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com and enable the API';
+      errorMessage = 'Invalid request to Gemini API';
+      solution = 'The model format might be incorrect';
+    } else if (error.response?.status === 404) {
+      errorMessage = 'Model not found';
+      solution = 'The specified Gemini model is not available';
     } else if (error.response?.status === 429) {
       errorMessage = 'Rate limit exceeded';
       solution = 'Wait a minute and try again';
     } else if (error.response?.status === 403) {
       errorMessage = 'API access forbidden';
       solution = 'Check if billing is enabled in Google Cloud Console';
-    } else if (error.code === 'ECONNABORTED') {
-      errorMessage = 'Request timeout';
-      solution = 'Check your internet connection';
     }
     
     res.status(500).json({ 
@@ -144,7 +222,7 @@ app.post('/api/generate-poem', async (req, res) => {
   }
 });
 
-// Health check endpoint
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'Server is running',
@@ -169,7 +247,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Listen on the port Render provides (or 5000 locally)
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n=== Server Started ===`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -177,7 +254,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`Google API Key configured: ${!!process.env.GOOGLE_API_KEY}`);
   if (process.env.GOOGLE_API_KEY) {
     console.log(`API Key prefix: ${process.env.GOOGLE_API_KEY.substring(0, 10)}`);
-    console.log(`API Key length: ${process.env.GOOGLE_API_KEY.length} characters`);
   }
   console.log('===================\n');
 });
