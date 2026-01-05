@@ -84,7 +84,7 @@ function App() {
         return `Error: ${data.error}\n${data.details || ''}`;
       }
     } catch (error) {
-      console.error("Error generating poem:", error);
+      console.error("Error generating poem:", API_URL);
       return "I'm experiencing some technical difficulties. Please try again later.";
     }
   };
