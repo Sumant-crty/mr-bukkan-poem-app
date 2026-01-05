@@ -1,109 +1,239 @@
-const express = require('express');
-const cors = require('cors');
-const axios = require('axios');
-require('dotenv').config();
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Loader2, Feather, Volume2, User } from 'lucide-react';
+import './App.css';
 
-const app = express();
-const PORT = process.env.PORT || 5000;
+function App() {
+  const [messages, setMessages] = useState([
+    { 
+      id: 1, 
+      text: "Hello! I'm Mr Bukkan, your personal poet. 🎭\n\nGive me any topic, and I'll craft a beautiful poem just for you. Try topics like 'sunset', 'friendship', 'dreams', or anything that inspires you!", 
+      sender: 'bot', 
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+    }
+  ]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [recitingMessageId, setRecitingMessageId] = useState(null);
+  const messagesEndRef = useRef(null);
 
-app.use(cors({ origin: '*' }));
-app.use(express.json());
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-// Root route - shows API info
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Mr Bukkan Poem API - Backend is running! 🎭',
-    status: 'operational',
-    version: '1.0.0',
-    endpoints: {
-      health: 'GET /api/health',
-      testAPI: 'GET /api/test-google-api',
-      generatePoem: 'POST /api/generate-poem'
-    },
-    documentation: 'Visit /api/health to check API status'
-  });
-});
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'running',
-    apiConfigured: !!process.env.GOOGLE_API_KEY,
-    timestamp: new Date().toISOString()
-  });
-});
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
-// Test Google API
-app.get('/api/test-google-api', async (req, res) => {
-  try {
-    const apiKey = process.env.GOOGLE_API_KEY;
-    
-    if (!apiKey) {
-      return res.json({ 
-        error: 'No API key configured',
-        solution: 'Add GOOGLE_API_KEY to Render Environment Variables'
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleRecite = (text, messageId) => {
+    if (!window.speechSynthesis) {
+      alert('Text-to-speech is not supported in your browser');
+      return;
+    }
+
+    if (recitingMessageId === messageId) {
+      window.speechSynthesis.cancel();
+      setRecitingMessageId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    setRecitingMessageId(messageId);
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.85;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onend = () => {
+      setRecitingMessageId(null);
+    };
+
+    utterance.onerror = (event) => {
+      console.error('Speech error:', event);
+      setRecitingMessageId(null);
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const generatePoem = async (topic) => {
+    try {
+      const response = await fetch(`${API_URL}/api/generate-poem`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ topic }),
       });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        return data.poem;
+      } else {
+        return `Error: ${data.error}\n${data.details || ''}`;
+      }
+    } catch (error) {
+      console.error("Error generating poem:", error);
+      return "I'm experiencing some technical difficulties. Please try again later.";
     }
+  };
 
-    const response = await axios.get(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
-    );
-    
-    return res.json({
-      success: true,
-      apiKeyValid: true,
-      availableModels: response.data.models?.map(m => m.name) || []
-    });
-  } catch (error) {
-    return res.json({
-      success: false,
-      error: error.response?.data?.error?.message || error.message
-    });
-  }
-});
-
-// Generate poem
-app.post('/api/generate-poem', async (req, res) => {
-  try {
-    const { topic } = req.body;
-    const apiKey = process.env.GOOGLE_API_KEY;
-
-    if (!topic || !apiKey) {
-      return res.status(400).json({ error: 'Missing required data' });
+  const handleSend = async () => {
+    if (input.trim() && !isLoading) {
+      const userMessage = {
+        id: messages.length + 1,
+        text: input,
+        sender: 'user',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      
+      setMessages([...messages, userMessage]);
+      const topic = input;
+      setInput('');
+      setIsLoading(true);
+      
+      const poem = await generatePoem(topic);
+      
+      const botMessage = {
+        id: messages.length + 2,
+        text: poem,
+        sender: 'bot',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      
+      setMessages(prev => [...prev, botMessage]);
+      setIsLoading(false);
     }
+  };
 
-    console.log('Generating poem for topic:', topic);
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-    
-    const response = await axios.post(url, {
-      contents: [{
-        parts: [{
-          text: `You are Mr Bukkan, a talented poet. Write a beautiful, creative, and engaging poem about "${topic}". Make it emotional, vivid, and memorable. The poem should be 8-16 lines long. Use beautiful imagery and metaphors. Only respond with the poem itself, no additional commentary.`
-        }]
-      }]
-    }, { timeout: 30000 });
-
-    const poem = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!poem) {
-      return res.status(500).json({ error: 'No poem generated' });
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
+  };
 
-    console.log('Poem generated successfully');
-    res.json({ poem });
+  return (
+    <div className="app-container">
+      {/* Header */}
+      <div className="header">
+        <div className="header-content">
+          <div className="header-icon">
+            <Feather className="icon-feather" />
+          </div>
+          <div>
+            <h1 className="header-title">Create Poem with Mr Bukkan</h1>
+            <p className="header-subtitle">
+              {isLoading ? 'Composing your poem...' : 'Your personal poet • Powered by Google Gemini'}
+            </p>
+          </div>
+        </div>
+      </div>
 
-  } catch (error) {
-    console.error('Error:', error.message);
-    res.status(500).json({ 
-      error: 'Failed to generate poem',
-      details: error.message
-    });
-  }
-});
+      {/* Messages Container */}
+      <div className="messages-container">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`message ${message.sender === 'user' ? 'message-user' : 'message-bot'}`}
+          >
+            <div className={`avatar ${message.sender === 'bot' ? 'avatar-bot' : 'avatar-user'}`}>
+              {message.sender === 'bot' ? (
+                <Feather className="avatar-icon" />
+              ) : (
+                <User className="avatar-icon" />
+              )}
+            </div>
+            <div className="message-content-wrapper">
+              <div className={`message-bubble ${message.sender === 'bot' ? 'bubble-bot' : 'bubble-user'}`}>
+                <p className="message-text">{message.text}</p>
+                {message.sender === 'bot' && message.id !== 1 && (
+                  <button
+                    onClick={() => handleRecite(message.text, message.id)}
+                    className={`recite-button ${recitingMessageId === message.id ? 'recite-active' : ''}`}
+                  >
+                    <Volume2 className={`recite-icon ${recitingMessageId === message.id ? 'icon-bounce' : ''}`} />
+                    <span>{recitingMessageId === message.id ? 'Stop' : 'Recite'}</span>
+                  </button>
+                )}
+              </div>
+              <p className="message-time">{message.time}</p>
+            </div>
+          </div>
+        ))}
+        
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="message message-bot">
+            <div className="avatar avatar-bot">
+              <Feather className="avatar-icon" />
+            </div>
+            <div className="message-content-wrapper">
+              <div className="message-bubble bubble-bot">
+                <div className="loading-indicator">
+                  <Loader2 className="loading-spinner" />
+                  <span className="loading-text">Crafting verses...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+      </div>
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log('✅ Server running on port', PORT);
-  console.log('✅ API Key configured:', !!process.env.GOOGLE_API_KEY);
-  console.log('✅ Backend URL: https://your-app.onrender.com');
-});
+      {/* Input Area */}
+      <div className="input-area">
+        <div className="input-container">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="Enter a topic for your poem..."
+            disabled={isLoading}
+            className="input-field"
+          />
+          <button
+            onClick={handleSend}
+            disabled={isLoading || !input.trim()}
+            className="send-button"
+          >
+            {isLoading ? (
+              <Loader2 className="button-icon spinner" />
+            ) : (
+              <Send className="button-icon" />
+            )}
+          </button>
+        </div>
+        
+        {/* Copyright and Hit Counter */}
+        <div className="footer">
+          <span className="footer-text">copyright©2026 Mr Bukkan</span>
+          <span className="footer-separator">•</span>
+          <span className="footer-text">📧 bukkan1309@gmail.com</span>
+          <span className="footer-separator">•</span>
+          <div className="visitor-counter">
+            <span className="visitor-label">👁️ Visitors:</span>
+            <div className="visitor-badge">
+              <span className="visitor-count">{messages.filter(m => m.sender === 'user').length + 1337}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;
