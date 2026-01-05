@@ -105,5 +105,5 @@ app.post('/api/generate-poem', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log('✅ Server running on port', PORT);
   console.log('✅ API Key configured:', !!process.env.GOOGLE_API_KEY);
-  console.log('✅ Backend URL: https://your-app.onrender.com');
+  console.log('✅ Backend URL: https://mr-bukkan-backend.onrender.com');
 });
