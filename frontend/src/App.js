@@ -85,7 +85,7 @@ function App() {
       }
     } catch (error) {
       console.error("Error generating poem:", API_URL);
-      return "I'm experiencing some technical difficulties. Please try again later.";
+      return "${API_URL} I'm experiencing some technical difficulties. Please try again later.";
     }
   };
 
