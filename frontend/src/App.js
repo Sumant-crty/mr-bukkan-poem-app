@@ -16,7 +16,7 @@ function App() {
   const [recitingMessageId, setRecitingMessageId] = useState(null);
   const messagesEndRef = useRef(null);
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const API_URL = 'https://mr-bukkan-backend.onrender.com'|| 'http://localhost:5000';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
