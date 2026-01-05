@@ -1,8 +1,7 @@
 Filename: README.md
 Content:
 # 🎭 Mr Bukkan Poem App
-
-AI-powered poem generator using Google Gemini API.
+Your personal Poet
 
 ## Features
 - Generate beautiful poems on any topic
